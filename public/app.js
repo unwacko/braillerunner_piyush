@@ -1,5 +1,5 @@
 import { detectBraille } from './dots.js'
-import { cellsToUnicode, unicodeToCells, decodeEnglish, decodeBharati, devaToScript, encodeFor, bharatiOddities } from './braille.js'
+import { unicodeToCells, decodeEnglish, decodeBharati, devaToScript, encodeFor, bharatiOddities, labelCells } from './braille.js'
 
 const $ = (id) => document.getElementById(id)
 const LANG_NAMES = {
@@ -82,13 +82,13 @@ async function run(canvas, blob) {
 }
 
 async function fromCells(cells) {
-  const braille = cellsToUnicode(cells)
   const eng = decodeEnglish(cells), dev = decodeBharati(cells)
   status('Identifying the language with Sarvam…')
   const id = await api('/api/identify', { eng, dev, oddities: bharatiOddities(cells) })
   const how = id.choice === 'A' ? 'English Grade 1 braille' : 'Bharati braille'
   // Bharati cells are script-neutral: a likely language can show the original writing in its own script.
   const original = (lang) => (id.choice === 'A' ? (lang === id.language ? eng : null) : lang === 'en-IN' ? null : devaToScript(dev, lang))
+  const braille = renderBraille(cells, labelCells(cells, id.choice === 'A' ? 'en' : 'bh', id.language), 'Braille as read')
   await showAndTranslate({ text: original(id.language), probs: id.probs, braille, how, lid: id.lid, original })
 }
 
@@ -113,10 +113,22 @@ function card(lang, p, highlighted) {
     </div>`
 }
 
+// Draw braille as real dot cells (raised dots dark, empty positions faint) with the letter under each cell.
+const DOT_ORDER = [0, 3, 1, 4, 2, 5] // grid reads left-right, top-down: dots 1 4 / 2 5 / 3 6
+function renderBraille(cells, labels, aria) {
+  labels = labels || cells.labels || []
+  const words = [[]]
+  cells.forEach((m, i) => (m < 0 ? words.push([]) : words.at(-1).push(
+    `<span class="cell"><span class="dots">${DOT_ORDER.map((b) => `<i${m >> b & 1 ? ' class="on"' : ''}></i>`).join('')}</span>` +
+    `<span class="lbl">${esc(labels[i] || '\u00a0')}</span></span>`)))
+  const html = words.filter((w) => w.length).map((w) => `<span class="word">${w.join('')}</span>`).join('')
+  return html ? `<div class="cells" role="img" aria-label="${esc(aria)}">${html}</div>` : ''
+}
+
 function fill(lang, text, note) {
   const el = $('card-' + lang)
   el.querySelector('.txt').textContent = text
-  el.querySelector('.br').textContent = cellsToUnicode(encodeFor(text, lang))
+  el.querySelector('.br').innerHTML = renderBraille(encodeFor(text, lang), null, `${LANG_NAMES[lang]} braille`)
   if (note) el.querySelector('.txt').insertAdjacentHTML('afterend', `<div class="note">${esc(note)}</div>`)
 }
 
@@ -127,7 +139,7 @@ async function showAndTranslate({ text, probs, braille, how, lid, original }) {
   const hidden = ranked.filter((r) => !shown.includes(r))
   $('out').innerHTML = `
     <p class="how">Read as <b>${esc(how)}</b>${lid ? ` · Sarvam LID says ${esc(lid)}` : ''}</p>
-    ${braille ? `<div class="br read" aria-label="braille as read">${esc(braille)}</div>` : ''}
+    ${braille ? `<div class="br read">${braille}</div>` : ''}
     <h2>Original language${shown.length > 1 ? 's' : ''}</h2>
     <div class="grid">${shown.map(([l, p]) => card(l, p, true)).join('')}</div>
     <button class="more secondary" id="more" aria-expanded="false" aria-controls="rest" title="Show other languages">⋯ ${hidden.length} more languages</button>

@@ -41,20 +41,28 @@ export function decodeEnglish(cells) {
   return out
 }
 
+// Cell list that also remembers a plain-language label for each cell (for the dot display).
+function labeled() {
+  const a = []
+  a.labels = []
+  a.put = (m, t = '') => { a.push(m); a.labels.push(t) }
+  return a
+}
+
 export function encodeEnglish(text) {
-  const cells = []
+  const cells = labeled()
   let num = false
   for (const ch of text) {
-    if (/\s/.test(ch)) { cells.push(-1); num = false; continue }
+    if (/\s/.test(ch)) { cells.put(-1); num = false; continue }
     if (/[0-9]/.test(ch)) {
-      if (!num) cells.push(NUM), (num = true)
-      cells.push(EN['jabcdefghi'[+ch]])
+      if (!num) cells.put(NUM, 'num'), (num = true)
+      cells.put(EN['jabcdefghi'[+ch]], ch)
       continue
     }
     num = false
     const lo = ch.toLowerCase()
-    if (EN[lo] != null) { if (ch !== lo) cells.push(CAP); cells.push(EN[lo]) }
-    else if (EN_P[ch] != null) cells.push(EN_P[ch])
+    if (EN[lo] != null) { if (ch !== lo) cells.put(CAP, 'Cap'); cells.put(EN[lo], ch) }
+    else if (EN_P[ch] != null) cells.put(EN_P[ch], ch)
   }
   return cells
 }
@@ -70,6 +78,7 @@ const C = {
   'ट': 23456, 'ठ': 2456, 'ड': 1246, 'ढ': 123456, 'ण': 3456, 'त': 2345, 'थ': 1456, 'द': 145, 'ध': 2346,
   'न': 1345, 'प': 1234, 'फ': 124, 'ब': 12, 'भ': 45, 'म': 134, 'य': 13456, 'र': 1235, 'ल': 123,
   'ळ': 456, 'व': 1236, 'श': 146, 'ष': 12346, 'स': 234, 'ह': 125, 'ड़': 12456,
+  'ऴ': 12356, 'ऱ': 12456, // Tamil/Malayalam ழ ഴ and ற റ (Bharati chart)
 }
 const CONJ = { 'क्ष': 12345, 'ज्ञ': 156 }
 const SIGNS = { 'ं': 56, 'ः': 6, 'ँ': 3, '्': 4, '़': 5, 'ऽ': 2, '।': 256, ',': 2, '?': 236, '!': 235 }
@@ -120,27 +129,46 @@ export function devaToScript(text, lang) {
   }).join('')
 }
 
+// Labels for signs, so a reader sees a letter they know instead of a bare diacritic.
+const SIGN_LABEL = { 'ं': 'अं', 'ः': 'अः', 'ँ': 'अँ', '्': 'halant', '़': 'nukta', 'ऽ': 'ऽ', '।': '.' }
+
 export function encodeBharati(text) {
-  const chars = [...text.normalize('NFC')].map(toDeva)
-  const cells = []
+  const orig = [...text.normalize('NFC')]
+  const chars = orig.map(toDeva)
+  // Show labels in the text's own script: shift Devanagari labels by the same block offset.
+  const shift = (s, i) => {
+    const delta = orig[i].codePointAt(0) - chars[i].codePointAt(0)
+    return delta ? [...s].map((c) => (c >= 'ऀ' && c <= 'ॿ' ? String.fromCodePoint(c.codePointAt(0) + delta) : c)).join('') : s
+  }
+  const cells = labeled()
   for (let i = 0; i < chars.length; i++) {
     const ch = chars[i], two = ch + (chars[i + 1] || '') + (chars[i + 2] || '')
-    if (/\s/.test(ch)) { cells.push(-1); continue }
-    if (CONJ[two]) { cells.push(mask(CONJ[two])); i += 2; continue }
+    if (/\s/.test(ch)) { cells.put(-1); continue }
+    if (CONJ[two]) { cells.put(mask(CONJ[two]), orig.slice(i, i + 3).join('')); i += 2; continue }
     if (/[0-9०-९]/.test(ch)) {
       const d = /[0-9]/.test(ch) ? +ch : ch.codePointAt(0) - 0x966
-      if (!/[0-9०-९]/.test(chars[i - 1] || '')) cells.push(NUM)
-      cells.push(EN['jabcdefghi'[d]])
+      if (!/[0-9०-९]/.test(chars[i - 1] || '')) cells.put(NUM, 'num')
+      cells.put(EN['jabcdefghi'[d]], String(d))
       continue
     }
-    if (ch === 'ऋ' || ch === 'ृ') { cells.push(mask(5), mask(1235)); continue }
-    if (C[ch]) { cells.push(mask(C[ch])); continue }
-    if (V[ch]) { cells.push(mask(V[ch][1])); continue }
-    if (MATRA_TO_VOWEL[ch]) { cells.push(mask(V[MATRA_TO_VOWEL[ch]][1])); continue }
-    if (SIGNS[ch]) { cells.push(mask(SIGNS[ch])); continue }
-    if (EN_P[ch] != null) cells.push(EN_P[ch])
+    if (ch === 'ऋ' || ch === 'ृ') { cells.put(mask(5)); cells.put(mask(1235), shift('ऋ', i)); continue }
+    if (C[ch]) { cells.put(mask(C[ch]), orig[i]); continue }
+    if (V[ch]) { cells.put(mask(V[ch][1]), orig[i]); continue }
+    if (MATRA_TO_VOWEL[ch]) { cells.put(mask(V[MATRA_TO_VOWEL[ch]][1]), shift(MATRA_TO_VOWEL[ch], i)); continue }
+    if (SIGNS[ch]) { cells.put(mask(SIGNS[ch]), SIGN_LABEL[ch] ? shift(SIGN_LABEL[ch], i) : ch); continue }
+    if (EN_P[ch] != null) cells.put(EN_P[ch], ch)
   }
   return cells
+}
+
+// Labels for cells read off a page, in the reading the language step chose.
+export function labelCells(cells, system, lang) {
+  return cells.map((m) => {
+    if (m < 0) return ''
+    if (system === 'en') return m === CAP ? 'Cap' : m === NUM ? 'num' : EN_REV[m] ?? EN_P_REV[m] ?? ''
+    const t = B_CONS[m] ?? B_VOW[m] ?? (B_SIGN[m] ? SIGN_LABEL[B_SIGN[m]] ?? B_SIGN[m] : '')
+    return devaToScript(t, lang)
+  })
 }
 
 export const encodeFor = (text, lang) =>
