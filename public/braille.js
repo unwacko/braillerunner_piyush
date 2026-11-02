@@ -95,6 +95,13 @@ export function decodeBharati(cells) {
   return out
 }
 
+// Cells a Bharati writer would never produce: अ (dot 1) straight after a consonant is the inherent vowel.
+export function bharatiOddities(cells) {
+  let n = 0
+  for (let i = 1; i < cells.length; i++) if (cells[i] === mask(1) && B_CONS[cells[i - 1]]) n++
+  return n
+}
+
 const SCRIPT_BASE = {
   'hi-IN': 0x900, 'mr-IN': 0x900, 'ne-IN': 0x900, 'sa-IN': 0x900, 'bn-IN': 0x980, 'as-IN': 0x980,
   'pa-IN': 0xa00, 'gu-IN': 0xa80, 'od-IN': 0xb00, 'ta-IN': 0xb80, 'te-IN': 0xc00, 'kn-IN': 0xc80, 'ml-IN': 0xd00,

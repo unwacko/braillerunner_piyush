@@ -84,31 +84,70 @@ function unzip(buf) {
   return out
 }
 
-// Decide whether the dots are English braille or Bharati braille, and which language.
-async function identify({ eng, dev }) {
-  const prompt = `A braille page was read cell-by-cell. The same cells were decoded two ways:
-A (English Grade 1 braille): "${eng}"
-B (Bharati braille, shown in Devanagari; Bharati cells are shared by all Indian scripts, so B may be Hindi, Marathi, Tamil, Bengali, etc. written phonetically): "${dev}"
-Which reading is meaningful text? If B, which Indian language is it?
-Reply with only JSON like {"choice":"A","language":"en-IN"} or {"choice":"B","language":"hi-IN"}.`
-  // Cells that have no meaning in one code are strong evidence for the other.
-  const bad = (s) => (s.match(/\?/g) || []).length
-  let choice = bad(eng) < bad(dev) ? 'A' : 'B', language = choice === 'A' ? 'en-IN' : 'hi-IN'
+const CODES = Object.keys(LANGS).join(', ')
+const PROB_RULES = `Give a probability for each candidate language (${CODES}). Many words are shared between languages (for example Hindi and Marathi share lots of vocabulary), so spread probability when the words fit several languages; probabilities sum to 1. Judge by vocabulary and grammar; personal and place names say nothing about the language.`
+
+async function askJson(prompt) {
+  const r = await sarvam('/v1/chat/completions', {
+    // reasoning off: with it on, the model spends the whole budget thinking and returns no JSON.
+    model: 'sarvam-105b', reasoning_effort: null, max_tokens: 800, temperature: 0,
+    messages: [{ role: 'user', content: prompt }],
+  })
+  const msg = r.choices[0].message
+  const raw = (msg.content || msg.reasoning_content || '').match(/\{[\s\S]*\}/)[0]
+  return JSON.parse(raw)
+}
+
+// Keep known codes, drop noise, renormalise. Falls back to a single label.
+function cleanProbs(probs, fallback, allowed = Object.keys(LANGS)) {
+  const out = {}
+  for (const [k, v] of Object.entries(probs || {})) if (allowed.includes(k) && +v > 0.005) out[k] = +v
+  const sum = Object.values(out).reduce((a, b) => a + b, 0)
+  if (!sum) return { [fallback]: 1 }
+  for (const k in out) out[k] = Math.round((out[k] / sum) * 1000) / 1000
+  return out
+}
+
+const top = (probs) => Object.entries(probs).sort((a, b) => b[1] - a[1])[0][0]
+
+// Decide whether the dots are English braille or Bharati braille, and how likely each language is.
+async function identify({ eng, dev, oddities = 0 }) {
+  // Cells that have no meaning (or are never written) in one code are strong evidence for the other.
+  const badEng = (eng.match(/\?/g) || []).length
+  const badDev = (dev.match(/\?/g) || []).length + oddities
+  let choice = badEng < badDev ? 'A' : 'B', probs = null
   try {
-    const r = await sarvam('/v1/chat/completions', {
-      model: 'sarvam-105b', reasoning_effort: 'low', max_tokens: 4000,
-      messages: [{ role: 'user', content: prompt }],
-    })
-    const msg = r.choices[0].message
-    const j = JSON.parse((msg.content || msg.reasoning_content || '').match(/\{[^}]*"choice"[^}]*\}/)[0])
-    if (bad(eng) === bad(dev)) choice = j.choice === 'B' ? 'B' : 'A'
-    language = choice === 'A' ? 'en-IN' : (LANGS[j.language] && j.language !== 'en-IN' ? j.language : 'hi-IN')
+    if (badEng === badDev) {
+      const j = await askJson(`Which of these two strings is real, meaningful text?
+A: "${eng}"
+B: "${dev}"
+A is read as English letters (it may be English, or an Indian language typed in Latin letters). B is Devanagari (it may be any Indian language written phonetically).
+Reply with only JSON like {"choice":"A"} or {"choice":"B"}.`)
+      choice = j.choice === 'B' ? 'B' : 'A'
+    }
+    probs = (await askJson(`What language is this text in? "${choice === 'A' ? eng : dev}"
+${choice === 'B' ? 'It was read from Bharati braille, which is shared by all Indian scripts, so it may be any Indian language written phonetically in Devanagari. Do not include English.\n' : ''}${PROB_RULES}
+Reply with only JSON like {"probs":{"hi-IN":0.6,"mr-IN":0.4}}.`)).probs
   } catch (e) { console.warn('identify chat failed:', e.message) }
-  // Sarvam language-ID as a second opinion on the chosen reading.
-  let lid = null
-  try { lid = await sarvam('/text-lid', { input: choice === 'A' ? eng : dev }) } catch {}
-  if (choice === 'B' && lid?.script_code === 'Deva' && LANGS[lid.language_code]) language = lid.language_code
-  return { choice, language, lid: lid?.language_code || null }
+  const lid = await sarvam('/text-lid', { input: choice === 'A' ? eng : dev }).catch(() => null)
+  const indic = Object.keys(LANGS).filter((l) => l !== 'en-IN')
+  const fallback = choice === 'A' ? 'en-IN' : (indic.includes(lid?.language_code) ? lid.language_code : 'hi-IN')
+  // English braille spells Latin letters, which may still be romanised Hindi etc.
+  probs = choice === 'A' ? cleanProbs(probs, fallback) : cleanProbs(probs, fallback, indic)
+  return { choice, probs, language: top(probs), lid: lid?.language_code || null }
+}
+
+async function lid({ text }) {
+  const l = await sarvam('/text-lid', { input: text }).catch(() => null)
+  const fallback = LANGS[l?.language_code] ? l.language_code : 'en-IN'
+  let probs
+  try {
+    probs = (await askJson(`What language is this text in? "${text}"
+${PROB_RULES}
+Reply with only JSON like {"probs":{"hi-IN":0.7,"mr-IN":0.3}}.`)).probs
+  } catch (e) { console.warn('lid chat failed:', e.message) }
+  probs = cleanProbs(probs, fallback)
+  return { probs, language: top(probs), lid: l?.language_code || null }
 }
 
 async function translateAll({ text, source }) {
@@ -122,11 +161,6 @@ async function translateAll({ text, source }) {
     } catch (e) { return { lang: target, name: LANGS[target], error: e.message } }
   }))
   return { results }
-}
-
-async function lid({ text }) {
-  const r = await sarvam('/text-lid', { input: text })
-  return { language: LANGS[r.language_code] ? r.language_code : 'en-IN', script: r.script_code }
 }
 
 const routes = {

@@ -1,5 +1,5 @@
 import { detectBraille } from './dots.js'
-import { cellsToUnicode, unicodeToCells, decodeEnglish, decodeBharati, devaToScript, encodeFor } from './braille.js'
+import { cellsToUnicode, unicodeToCells, decodeEnglish, decodeBharati, devaToScript, encodeFor, bharatiOddities } from './braille.js'
 
 const $ = (id) => document.getElementById(id)
 const LANG_NAMES = {
@@ -85,34 +85,67 @@ async function fromCells(cells) {
   const braille = cellsToUnicode(cells)
   const eng = decodeEnglish(cells), dev = decodeBharati(cells)
   status('Identifying the language with Sarvam…')
-  const id = await api('/api/identify', { eng, dev })
-  const text = id.choice === 'A' ? eng : devaToScript(dev, id.language)
+  const id = await api('/api/identify', { eng, dev, oddities: bharatiOddities(cells) })
   const how = id.choice === 'A' ? 'English Grade 1 braille' : 'Bharati braille'
-  await showAndTranslate(text, id.language, braille, `${how} → ${LANG_NAMES[id.language]}` + (id.lid ? ` (Sarvam LID: ${id.lid})` : ''))
+  // Bharati cells are script-neutral: a likely language can show the original writing in its own script.
+  const original = (lang) => (id.choice === 'A' ? (lang === id.language ? eng : null) : lang === 'en-IN' ? null : devaToScript(dev, lang))
+  await showAndTranslate({ text: original(id.language), probs: id.probs, braille, how, lid: id.lid, original })
 }
 
 async function fromText(text) {
   status('Identifying the language with Sarvam…')
-  const { language } = await api('/api/lid', { text })
-  await showAndTranslate(text, language, null, `Text → ${LANG_NAMES[language]}`)
+  const id = await api('/api/lid', { text })
+  await showAndTranslate({ text, probs: id.probs, how: 'Text', lid: id.lid, original: (l) => (l === id.language ? text : null) })
 }
 
-async function showAndTranslate(text, lang, braille, how) {
+const pct = (p) => (p >= 0.995 ? '100%' : p < 0.01 && p > 0 ? '<1%' : Math.round(p * 100) + '%')
+
+function card(lang, p, highlighted) {
+  return `
+    <div class="card${highlighted ? ' hl' : ''}" id="card-${lang}">
+      <h3><span>${esc(LANG_NAMES[lang])}</span><span>${esc(lang)}</span></h3>
+      <div class="txt" lang="${lang}"><span class="muted">Translating…</span></div>
+      <div class="br"></div>
+      <div class="prob" title="Sarvam-105B estimate">
+        <div class="bar"><i style="width:${Math.max(p * 100, p > 0 ? 1 : 0)}%"></i></div>
+        <span>${pct(p)} likely ${highlighted ? 'the original language' : ''}</span>
+      </div>
+    </div>`
+}
+
+function fill(lang, text, note) {
+  const el = $('card-' + lang)
+  el.querySelector('.txt').textContent = text
+  el.querySelector('.br').textContent = cellsToUnicode(encodeFor(text, lang))
+  if (note) el.querySelector('.txt').insertAdjacentHTML('afterend', `<div class="note">${esc(note)}</div>`)
+}
+
+async function showAndTranslate({ text, probs, braille, how, lid, original }) {
+  const ranked = Object.keys(LANG_NAMES).map((l) => [l, probs[l] || 0]).sort((a, b) => b[1] - a[1])
+  const source = ranked[0][0]
+  const shown = ranked.filter(([l, p], i) => i === 0 || p > 0.1)
+  const hidden = ranked.filter((r) => !shown.includes(r))
   $('out').innerHTML = `
-    <div class="card src">
-      <h3><span>Read: ${esc(how)}</span></h3>
-      ${braille ? `<div class="br" aria-label="braille as read">${esc(braille)}</div>` : ''}
-      <div class="txt" lang="${lang}">${esc(text)}</div>
-    </div>
-    <div class="grid" id="grid"></div>`
-  status(`Translating into ${Object.keys(LANG_NAMES).length - 1} languages with Sarvam Translate…`)
-  const { results } = await api('/api/translate', { text, source: lang })
-  $('grid').innerHTML = results.map((r) => `
-    <div class="card">
-      <h3><span>${esc(r.name)}</span><span>${esc(r.lang)}</span></h3>
-      ${r.error ? `<div class="err">${esc(r.error)}</div>` : `
-        <div class="txt" lang="${r.lang}">${esc(r.text)}</div>
-        <div class="br" aria-label="${esc(r.name)} braille">${esc(cellsToUnicode(encodeFor(r.text, r.lang)))}</div>`}
-    </div>`).join('')
+    <p class="how">Read as <b>${esc(how)}</b>${lid ? ` · Sarvam LID says ${esc(lid)}` : ''}</p>
+    ${braille ? `<div class="br read" aria-label="braille as read">${esc(braille)}</div>` : ''}
+    <h2>Original language${shown.length > 1 ? 's' : ''}</h2>
+    <div class="grid">${shown.map(([l, p]) => card(l, p, true)).join('')}</div>
+    <button class="more secondary" id="more" aria-expanded="false" aria-controls="rest" title="Show other languages">⋯ ${hidden.length} more languages</button>
+    <div class="grid" id="rest" hidden>${hidden.map(([l, p]) => card(l, p, false)).join('')}</div>`
+  $('more').onclick = () => {
+    const open = $('rest').hidden
+    $('rest').hidden = !open
+    $('more').setAttribute('aria-expanded', open)
+    $('more').textContent = open ? 'Hide other languages' : `⋯ ${hidden.length} more languages`
+  }
+  for (const [l] of shown) if (original(l)) fill(l, original(l), l === source ? null : 'Same writing, read in this language')
+
+  status(`Translating into ${ranked.length - 1} languages with Sarvam Translate…`)
+  const { results } = await api('/api/translate', { text, source })
+  for (const r of results) {
+    if (shown.some(([l]) => l === r.lang) && original(r.lang)) continue
+    if (r.error) $('card-' + r.lang).querySelector('.txt').innerHTML = `<span class="err">${esc(r.error)}</span>`
+    else fill(r.lang, r.text, shown.some(([l]) => l === r.lang) ? 'Translation' : null)
+  }
   status('Done.')
 }
