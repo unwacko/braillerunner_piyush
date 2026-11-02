@@ -1,4 +1,4 @@
-# Braille Bridge
+# Braille Runner
 
 Turn braille writing by blind students (on paper, or dots on a screen) into text in 11 languages, and show each one back in braille.
 
