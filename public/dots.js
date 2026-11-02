@@ -31,6 +31,7 @@ export function detectBraille(canvas) {
 
   // Connected components -> blobs.
   const lab = new Int32Array(W * H), blobs = [], stack = []
+  let shapes = 0
   for (let i = 0; i < W * H; i++) {
     if (!bin[i] || lab[i]) continue
     let n = 0, sx = 0, sy = 0, minx = W, maxx = 0, miny = H, maxy = 0
@@ -46,9 +47,13 @@ export function detectBraille(canvas) {
       }
     }
     const bw = maxx - minx + 1, bh = maxy - miny + 1
-    if (n >= 6 && bw / bh < 2 && bh / bw < 2 && n / (bw * bh) > 0.45) blobs.push({ x: sx / n, y: sy / n, n, r: Math.max(bw, bh) / 2 })
+    if (n < 6) continue
+    shapes++
+    // A filled disc covers ~78% of its box; letters like o, e, a cover much less.
+    if (bw / bh < 1.6 && bh / bw < 1.6 && n / (bw * bh) > 0.6) blobs.push({ x: sx / n, y: sy / n, n, r: Math.max(bw, bh) / 2 })
   }
-  if (blobs.length < 2) return null
+  // Printed text: most dark shapes are not round dots, so leave it to Sarvam Vision.
+  if (blobs.length < 2 || blobs.length < shapes * 0.6) return null
   const areas = blobs.map((b) => b.n).sort((a, b) => a - b)
   const med = areas[areas.length >> 1]
   const dots = blobs.filter((b) => b.n > med * 0.35 && b.n < med * 2.8)

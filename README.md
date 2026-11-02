@@ -18,6 +18,14 @@ npm start              # http://localhost:8787
 
 No dependencies; needs Node 20+. Try `public/samples/hindi.png` and `public/samples/english.png`.
 
+## Deploy on Netlify
+
+`netlify.toml` publishes `public/` and serves `/api/*` from `netlify/functions/api.mjs`, which reuses `lib/api.js`.
+
+1. Import the GitHub repo in Netlify (no build command needed).
+2. In **Site configuration → Environment variables**, add `SARVAM_API_KEY`.
+3. Redeploy. If the key is missing, the page shows "SARVAM_API_KEY is not set on the server".
+
 ## Sources
 
 - English: Braille Works alphabet card (Grade 1).

@@ -55,12 +55,12 @@ function loadImage(blob) {
     c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale)
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height)
     c.style.display = 'block'
-    run(c, blob).catch((e) => status('Error: ' + e.message))
+    run(c).catch((e) => status('Error: ' + e.message))
   }
   img.src = URL.createObjectURL(blob)
 }
 
-async function run(canvas, blob) {
+async function run(canvas) {
   $('out').innerHTML = ''
   status('Looking for braille dots…')
   const found = detectBraille(canvas)
@@ -73,9 +73,17 @@ async function run(canvas, blob) {
   }
   // No dot grid: let Sarvam Vision read the page (printed/typed text or braille characters on screen).
   status('No dot grid found. Reading the page with Sarvam Vision…')
-  const dataUrl = await new Promise((r) => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(blob) })
-  const { markdown } = await api('/api/ocr', { image: dataUrl })
-  const clean = markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/^\*[\s\S]*?\*$/gm, '').trim()
+  // Send the downscaled preview (no dots were drawn on it) so the upload stays well under host body limits.
+  const { job_id } = await api('/api/ocr/start', { image: canvas.toDataURL('image/jpeg', 0.9) })
+  let markdown = null
+  for (let i = 0; i < 40 && markdown == null; i++) {
+    await new Promise((r) => setTimeout(r, 1500))
+    const r = await api('/api/ocr/check', { job_id })
+    if (r.done) markdown = r.markdown
+  }
+  if (markdown == null) return status('Sarvam Vision took too long. Please try again.')
+  const clean = markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, '').replace(/^\*[\s\S]*?\*$/gm, '')
+    .replace(/^#+\s*/gm, '').replace(/\*\*|__/g, '').trim()
   if (/[⠀-⣿]/.test(clean)) return fromCells(unicodeToCells(clean))
   if (!clean) return status('Could not find braille or text in this image. Try a straighter, brighter photo.')
   return fromText(clean)
