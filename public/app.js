@@ -114,6 +114,7 @@ function card(lang, p, highlighted) {
       <h3><span>${esc(LANG_NAMES[lang])}</span><span>${esc(lang)}</span></h3>
       <div class="txt" lang="${lang}"><span class="muted">Translating…</span></div>
       <div class="br"></div>
+      <button class="listen secondary" data-lang="${lang}" disabled aria-label="Read aloud in ${esc(LANG_NAMES[lang])}">🔊 Listen</button>
       <div class="prob" title="Sarvam-105B estimate">
         <div class="bar"><i style="width:${Math.max(p * 100, p > 0 ? 1 : 0)}%"></i></div>
         <span>${pct(p)} likely ${highlighted ? 'the original language' : ''}</span>
@@ -138,7 +139,34 @@ function fill(lang, text, note) {
   el.querySelector('.txt').textContent = text
   el.querySelector('.br').innerHTML = renderBraille(encodeFor(text, lang), null, `${LANG_NAMES[lang]} braille`)
   if (note) el.querySelector('.txt').insertAdjacentHTML('afterend', `<div class="note">${esc(note)}</div>`)
+  el.querySelector('.listen').disabled = false
 }
+
+// Read aloud with Sarvam Bulbul. One clip plays at a time; clicking again stops it.
+let playing = null
+const audioCache = new Map()
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.listen')
+  if (!btn || btn.disabled) return
+  const lang = btn.dataset.lang
+  const text = $('card-' + lang).querySelector('.txt').textContent
+  const wasMe = playing?.btn === btn
+  if (playing) { playing.audio.pause(); playing.btn.textContent = '🔊 Listen'; playing = null }
+  if (wasMe) return
+  btn.textContent = 'Loading…'
+  try {
+    const key = lang + '|' + text
+    if (!audioCache.has(key)) audioCache.set(key, (await api('/api/speak', { text, lang })).audio)
+    const audio = new Audio('data:audio/wav;base64,' + audioCache.get(key))
+    playing = { audio, btn }
+    btn.textContent = '■ Stop'
+    audio.onended = () => { if (playing?.audio === audio) { btn.textContent = '🔊 Listen'; playing = null } }
+    await audio.play()
+  } catch (err) {
+    btn.textContent = '🔊 Listen'
+    status('Could not read aloud: ' + err.message)
+  }
+})
 
 async function showAndTranslate({ text, probs, braille, how, lid, original }) {
   const ranked = Object.keys(LANG_NAMES).map((l) => [l, probs[l] || 0]).sort((a, b) => b[1] - a[1])
