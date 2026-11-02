@@ -7,80 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600&family=Instrument+Sans:wght@400;500&display=swap" rel="stylesheet">
-<style>
-  /* Visual language modelled on sarvam.ai: soft sky gradient, pill buttons, indigo tagline, quiet greys. */
-  :root {
-    color-scheme: light;
-    --ink: #1f1f1f; --body: #3d3d3d; --muted: #6e6e73; --line: #e7e7ea;
-    --navy: #2a2c33; --chip: #f5f5f5; --indigo: #212191; --card: #ffffff; --bg: #fbfbfc;
-  }
-  * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 425 16px/1.6 Figtree, "Noto Sans", system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-  .sky { position: absolute; inset: 0 0 auto 0; height: 640px; z-index: -1;
-    background:
-      radial-gradient(60% 120px at 50% 0%, #fde3cf 0%, transparent 100%),
-      radial-gradient(80% 260px at 50% 140px, #cdd6fb 0%, transparent 100%),
-      linear-gradient(#fff0, var(--bg) 95%); }
-  header { display: flex; align-items: center; justify-content: space-between; max-width: 1120px; margin: 0 auto; padding: 22px 24px; }
-  .wordmark { font: 600 26px/1 "Instrument Sans", Figtree, sans-serif; letter-spacing: -0.8px; color: var(--ink); text-decoration: none; display: flex; align-items: center; gap: 10px; }
-  .wordmark span { font-size: 22px; letter-spacing: 1px; color: var(--indigo); }
-  .powered { background: var(--chip); color: var(--ink); border-radius: 999px; padding: 10px 18px; font-size: 15px; font-weight: 525; }
-  main { max-width: 1120px; margin: 0 auto; padding: 0 16px 80px; }
-  .hero { text-align: center; padding: 56px 0 24px; }
-  .ornament { font-size: 28px; letter-spacing: 6px; color: #fff; text-shadow: 0 0 1px #9aa4d6, 0 1px 6px #b9c2ee; }
-  .tagline { display: inline-block; margin: 18px 0 22px; padding: 8px 40px; color: var(--indigo); font-size: 14px; letter-spacing: 0.35px;
-    border-image: linear-gradient(90deg, transparent, #5b63c9aa, transparent) 1; border-width: 1px 0; border-style: solid; }
-  h1 { font: 400 clamp(36px, 6vw, 64px)/1.08 "Instrument Sans", Figtree, sans-serif; letter-spacing: -1.6px; color: var(--ink); margin: 0 auto 18px; max-width: 820px; }
-  .sub { color: var(--body); font-size: clamp(16px, 2vw, 20px); max-width: 680px; margin: 0 auto 32px; }
-  .buttons { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
-  button { font: 525 17px/1 Figtree, sans-serif; padding: 18px 30px; border-radius: 999px; border: 0; cursor: pointer; transition: transform .15s, box-shadow .15s; }
-  button.primary { background: linear-gradient(#3a3d4a, var(--navy)); color: #fff; box-shadow: 0 6px 18px #2a2c3333; }
-  button.secondary { background: linear-gradient(#fff, var(--chip)); color: var(--ink); box-shadow: inset 0 0 0 1px #dcdce0; }
-  button:hover { transform: translateY(-1px); }
-  button:focus-visible { outline: 3px solid var(--indigo); outline-offset: 3px; }
-  .hint { color: var(--muted); font-size: 14px; margin-top: 16px; }
-  #cam { display: none; margin: 24px auto 0; max-width: 620px; text-align: center; }
-  #cam video { width: 100%; border-radius: 24px; background: #000; display: block; margin-bottom: 14px; }
-  #status { text-align: center; margin: 28px 0 0; color: var(--indigo); font-weight: 500; min-height: 1.6em; }
-  #preview { display: none; margin: 20px auto 0; max-width: 100%; border-radius: 20px; box-shadow: 0 1px 0 var(--line), 0 12px 32px #1f1f1f10; background: #fff; }
-  #out { margin-top: 12px; }
-  .how { text-align: center; color: var(--muted); margin: 24px 0 6px; }
-  h2 { font: 400 28px/1.2 "Instrument Sans", Figtree, sans-serif; letter-spacing: -0.6px; text-align: center; margin: 40px 0 6px; }
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; margin-top: 16px; }
-  .grid[hidden] { display: none; }
-  .card { background: var(--card); border-radius: 20px; padding: 20px 22px; box-shadow: 0 0 0 1px var(--line), 0 8px 24px #1f1f1f08; }
-  .card h3 { margin: 0 0 10px; font-size: 13px; color: var(--muted); font-weight: 500; letter-spacing: .4px; text-transform: uppercase; display: flex; justify-content: space-between; gap: 8px; }
-  .card.hl { background: linear-gradient(160deg, #ffffff 0%, #eef0fe 100%); box-shadow: 0 0 0 1.5px #b7bdf0, 0 12px 32px #2121911a; }
-  .card.hl h3 { color: var(--indigo); }
-  .txt { font-size: 21px; color: var(--ink); overflow-wrap: anywhere; }
-  .card.hl .txt { font: 400 28px/1.3 "Instrument Sans", Figtree, sans-serif; letter-spacing: -0.4px; }
-  .br { margin-top: 12px; }
-  .cells { display: flex; flex-wrap: wrap; gap: 10px 18px; }
-  .word { display: inline-flex; gap: 6px; }
-  .cell { display: inline-flex; flex-direction: column; align-items: center; gap: 4px; min-width: 26px; }
-  .dots { display: grid; grid-template-columns: repeat(2, 9px); grid-auto-rows: 9px; gap: 4px; padding: 5px 6px; border-radius: 8px; background: #f3f3f7; }
-  .dots i { border-radius: 50%; box-shadow: inset 0 0 0 1.5px #d4d5df; }
-  .dots i.on { background: var(--ink); box-shadow: none; }
-  .lbl { font-size: 14px; line-height: 1.2; color: var(--body); white-space: nowrap; }
-  .card.hl .dots { background: #fff; }
-  .br.read { display: flex; justify-content: center; margin: 8px 0 0; }
-  .br.read .dots { grid-template-columns: repeat(2, 12px); grid-auto-rows: 12px; gap: 5px; }
-  .br.read .lbl { font-size: 16px; }
-  .prob { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 14px; color: var(--muted); }
-  .bar { flex: 0 0 96px; height: 6px; border-radius: 999px; background: #ececf2; overflow: hidden; }
-  .bar i { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #7c83e6, var(--indigo)); }
-  .card.hl .prob { color: var(--indigo); font-weight: 500; }
-  .note, .muted { color: var(--muted); font-size: 13px; }
-  .more { display: block; margin: 28px auto 0; padding: 14px 26px; font-size: 16px; }
-  .err { color: #b3261e; }
-  footer { text-align: center; color: var(--muted); font-size: 13px; padding: 24px 16px 40px; }
-  @media (max-width: 560px) { header { padding: 18px 16px; } .powered { display: none; } button { width: 100%; } }
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="sky" aria-hidden="true"></div>
 <header>
   <a class="wordmark" href="/">braille runner <span aria-hidden="true">⠃⠗</span></a>
+  <nav class="tabs" aria-label="Site">
+    <a href="/" aria-current="page">Translate</a>
+    <a href="/authors.html">Braille authors</a>
+  </nav>
   <div class="powered">Powered by Sarvam AI</div>
 </header>
 <main>
@@ -106,8 +42,49 @@
   <p id="status" role="status" aria-live="polite"></p>
   <canvas id="preview"></canvas>
   <div id="out"></div>
+
+  <section class="why" aria-labelledby="why-title">
+    <div class="eyebrow">Why this matters</div>
+    <h2 id="why-title">Braille needs a reader on both sides of the page</h2>
+    <p class="lede">A blind child can write fluently in braille, but most of the people around them can't read it. Teachers, parents and examiners need it in print, in their own language, and in India that could be any of more than twenty. Braille Runner reads braille from one photo and turns it into 11 Indian languages, as text and as braille.</p>
+
+    <div class="stats">
+      <div class="stat"><b>Millions</b><span>of blind and low-vision people live in India, one of the largest such populations in the world</span></div>
+      <div class="stat"><b>1 script</b><span>Bharati braille uses one set of cells for Hindi, Tamil, Bengali and other Indian scripts</span></div>
+      <div class="stat"><b>1 phone</b><span>is all you need: no embosser, no braille teacher, no special software</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Rural schools</h3>
+        <p>In a village school there is often no special educator for many kilometres. A blind student may sit in a regular classroom where the teacher has never learned braille, so their homework goes unmarked. With a phone photo, that teacher can read the work in Marathi, Odia or Kannada and grade it the same day.</p>
+      </div>
+      <div class="card">
+        <h3>Urban schools</h3>
+        <p>Inclusive schools in cities enrol blind students next to sighted classmates, but resource teachers are stretched across many classes. Subject teachers, parents and classmates can read a braille answer sheet themselves. A student who writes in English braille can also share it with a grandparent who reads only Bengali.</p>
+      </div>
+      <div class="card">
+        <h3>People with no resources</h3>
+        <p>Braille translation software, embossers and trained transcribers cost money that most families don't have. Braille Runner needs only a borrowed phone and a browser. A letter or note in braille becomes readable for the whole family, in their own language, for free.</p>
+      </div>
+    </div>
+
+    <div class="legacy">
+      <h3>Saving braille literature before the dots wear away</h3>
+      <p>Braille books are pressed into paper, and the dots flatten each time a finger reads them. Handwritten braille notebooks, letters and poems, many of them in Indian languages, survive as a single copy in a school cupboard. Photographing and transcribing them keeps them alive, makes them searchable, and lets sighted readers find them too.</p>
+      <p>This matters because blind writers have shaped literature for thousands of years, and India's tradition runs deep: the bhakti poet Surdas, Sahitya Akademi winner Jagadguru Rambhadracharya, the memoirist Ved Mehta, and the composer-lyricist Ravindra Jain. Writers abroad belong to the same story, from Homer and Milton to Helen Keller and Borges.</p>
+      <ul class="names" aria-label="Some great blind authors">
+        <li class="in">Surdas</li><li class="in">Jagadguru Rambhadracharya</li><li class="in">Ved Mehta</li><li class="in">Ravindra Jain</li><li class="in">Puttaraj Gawai</li>
+        <li>Helen Keller</li><li>Louis Braille</li><li>John Milton</li><li>Jorge Luis Borges</li><li>Taha Hussein</li>
+      </ul>
+      <a class="cta" href="/authors.html">Meet the great braille authors →</a>
+    </div>
+  </section>
 </main>
-<footer>Sarvam Vision · Sarvam-105B · Sarvam Text-LID · Sarvam Translate</footer>
+<footer>
+  <div>Sarvam Vision · Sarvam-105B · Sarvam Text-LID · Sarvam Translate</div>
+  <div class="credit">Made by <a href="https://www.linkedin.com/in/piyushpitre" target="_blank" rel="noopener">Piyush Pitre</a></div>
+</footer>
 <script type="module" src="app.js"></script>
 </body>
 </html>
