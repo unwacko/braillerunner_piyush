@@ -190,4 +190,4 @@ http.createServer(async (req, res) => {
   if (!file.startsWith(path.join(DIR, 'public')) || !fs.existsSync(file)) return res.writeHead(404).end('not found')
   res.writeHead(200, { 'Content-Type': (MIME[path.extname(file)] || 'application/octet-stream') + '; charset=utf-8' })
   fs.createReadStream(file).pipe(res)
-}).listen(PORT, () => console.log(`Braille Bridge on http://localhost:${PORT}`))
+}).listen(PORT, () => console.log(`Braille Runner on http://localhost:${PORT}`))
