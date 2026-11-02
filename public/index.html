@@ -26,10 +26,22 @@
     <div class="tagline">Braille in, every Indian language out</div>
     <h1>Braille for all, in every Indian language</h1>
     <p class="sub">Photograph braille written in English or Bharati braille. We read the dots, recognise the language, and show it in 11 languages, as text and as braille.</p>
-    <div class="buttons">
-      <button id="btnCam" class="primary">Take picture with webcam</button>
-      <button id="btnUpload" class="secondary">Upload image</button>
-      <input id="file" type="file" accept="image/*" hidden>
+    <div class="actions">
+      <div class="buttons">
+        <button id="btnCam" class="primary">Take picture with webcam</button>
+        <button id="btnUpload" class="secondary">Upload image</button>
+        <input id="file" type="file" accept="image/*" hidden>
+      </div>
+      <aside class="apis" aria-labelledby="apis-title">
+        <h2 id="apis-title">Sarvam APIs used</h2>
+        <ol>
+          <li><span class="name"><b>Sarvam Vision</b> <span class="api">Document AI · Parse</span></span><span class="what">Reads printed text from photos without dots</span></li>
+          <li><span class="name"><b>Sarvam-105B</b> <span class="api">Chat Completions</span></span><span class="what">Picks the braille reading and language odds</span></li>
+          <li><span class="name"><b>Text-LID</b> <span class="api">Language Identification</span></span><span class="what">Confirms which language the text is in</span></li>
+          <li><span class="name"><b>Sarvam Translate</b> <span class="api">sarvam-translate:v1</span></span><span class="what">Translates the text into 10 more languages</span></li>
+          <li><span class="name"><b>Bulbul v3</b> <span class="api">Text-to-Speech</span></span><span class="what">Reads every translation aloud in its language</span></li>
+        </ol>
+      </aside>
     </div>
     <p class="hint">Or paste an image, or braille text like ⠓⠑⠇⠇⠕, anywhere on this page with Ctrl/⌘+V.</p>
   </section>

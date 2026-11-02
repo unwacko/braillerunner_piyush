@@ -124,3 +124,17 @@ html { scroll-behavior: smooth; }
 @keyframes flash { 0%, 100% { background-color: #212191; filter: brightness(1); } 50% { filter: brightness(1.45); } }
 .why { scroll-margin-top: 24px; }
 @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .banner { animation: none; } }
+
+/* Hero: buttons beside the list of Sarvam APIs the app calls */
+.actions { display: grid; grid-template-columns: minmax(240px, 300px) minmax(0, 520px); gap: 28px; justify-content: center; align-items: center; text-align: left; }
+.actions .buttons { flex-direction: column; align-items: stretch; }
+.apis { background: linear-gradient(160deg, #ffffff, #eef0fe); border-radius: 22px; padding: 20px 24px; box-shadow: 0 0 0 1.5px #b7bdf0, 0 14px 36px #2121911f; }
+.apis h2 { margin: 0 0 12px; font: 600 13px/1.2 Figtree, sans-serif; letter-spacing: .7px; text-transform: uppercase; color: var(--indigo); text-align: left; }
+.apis ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; counter-reset: api; }
+.apis li { counter-increment: api; display: grid; grid-template-columns: 26px 1fr; column-gap: 10px; align-items: baseline; }
+.apis li::before { content: counter(api); grid-row: span 2; width: 24px; height: 24px; border-radius: 50%; background: var(--indigo); color: #fff; font-size: 13px; font-weight: 600; display: grid; place-items: center; align-self: start; }
+.apis b { font-size: 17px; color: var(--ink); }
+.apis .api { margin-left: 8px; font-size: 12px; color: var(--indigo); background: #e3e6fd; border-radius: 999px; padding: 2px 9px; white-space: nowrap; }
+.apis .name { grid-column: 2; }
+.apis .what { grid-column: 2; display: block; font-size: 15px; color: var(--body); }
+@media (max-width: 760px) { .actions { grid-template-columns: 1fr; } }
